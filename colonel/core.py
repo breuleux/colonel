@@ -691,8 +691,21 @@ class Gate:
     def set_outgoing(self, port, value):
         pnum = self.port_num(port)
         self.outgoing[pnum] = value
+        if value is VOID:
+            self.set_tag_outgoing(pnum, NOTAG)
+        else:
+            self.set_tag_outgoing(pnum, AVAIL)
         for listener in self.listeners:
             listener.set_outgoing(self, port, value)
+
+    def set_tag_outgoing(self, port, tag):
+        pnum = self.port_num(port)
+        if self.tags_outgoing[pnum] == tag:
+            return False
+        self.tags_outgoing[pnum] = tag
+        for listener in self.listeners:
+            listener.set_outgoing_tag(self, port, tag)
+        return True
 
     def set_tag(self, port, tag):
         pnum = self.port_num(port)

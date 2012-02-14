@@ -4,6 +4,13 @@ def noop(*x, **y):
     pass
 
 
+def same(x, y):
+    if hasattr(x, 'same'):
+        return x.same(y)
+    else:
+        return x == y
+
+
 class Logged:
 
     def __init__(self):
@@ -33,7 +40,7 @@ class LL(Logged):
         for child in elements:
             if hasattr(child, 'log_with'):
                 child.log_with(self.__logger__)
-        return self.__logger__('ll', start, end, elements)
+        return self.log('ll', start, end, elements)
 
     def log_with(self, logger = noop):
         if super().log_with(logger):
@@ -66,13 +73,11 @@ class LL(Logged):
 
     def append(self, element):
         elms = self.__elems__
-        self.log_ll(len(elms), len(elms), [element])
-        self[len(self):] = [element]
+        self[len(elms):] = [element]
 
     def extend(self, elements):
         elms = self.__elems__
-        self.log_ll(len(elms), len(elms), elements)
-        self[len(self):] = elements
+        self[len(elms):] = elements
 
     def __iadd__(self, elements):
         self.extend(elements)
@@ -92,6 +97,12 @@ class LL(Logged):
         val = self[n]
         self[n:n+1] = []
         return val
+
+    def same(self, other):
+        return (type(self) == type(other)
+                and all(same(x, y)
+                        for x, y in zip(self.__elems__,
+                                        other.__elems__)))
 
     def __len__(self):
         return len(self.__elems__)
@@ -118,7 +129,7 @@ class LAD(Logged):
     def log_lad(self, item, value, old_value):
         if hasattr(value, 'log_with'):
             value.log_with(self.__logger__)
-        return self.__logger__('lad', item, value, old_value)
+        return self.log('lad', item, value, old_value)
 
 
     # Dict behavior
@@ -165,6 +176,11 @@ class LAD(Logged):
     def __len__(self):
         return len(self.__props__)
 
+    def same(self, other):
+        return (type(self) == type(other)
+                and all(same(v, other[k])
+                        for k, v in self.items()))
+
 
 class LADLL(LAD, LL):
 
@@ -200,5 +216,8 @@ class LADLL(LAD, LL):
 
     def __len__(self):
         return LL.__len__(self) + LAD.__len__(self)
+
+    def same(self, other):
+        return LL.same(self, other) and LAD.same(self, other)
 
 

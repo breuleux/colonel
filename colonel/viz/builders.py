@@ -70,7 +70,7 @@ class SVGListener(core.GateListener):
         figure = self.gate_map[gate]
         isc = isinstance(gate, core.Circuit)
         if triggered:
-            figure.shape.style.fill = '#dddddd' if isc else '40ff40'
+            figure.shape.style.fill = '#dddddd' if isc else '#40ff40'
         else:
             figure.shape.style.fill = '#aaaaaa' if isc else '#8080ff'
 
@@ -155,6 +155,7 @@ class SVGListener(core.GateListener):
                          style = {'text-anchor': 'middle',
                                   'font-size': font_size})
             label.class_ = 'link-label'
+
             group.append(label)
 
             line.label = group

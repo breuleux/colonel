@@ -2,6 +2,7 @@
 from .. import dmerge, LL, LAD, LADLL
 from . import prop
 
+__n__ = 0
 
 class Tag(LADLL):
 
@@ -12,8 +13,12 @@ class Tag(LADLL):
                       'style': (prop.Style, {})}
 
     def __init__(self, *elements, **attributes):
+        global __n__
         defaults = {name: generator(init)
                     for name, (generator, init) in self.__attributes__.items()}
+        if 'id' not in attributes:
+            attributes['id'] = 'elm{n}'.format(n = __n__)
+            __n__ += 1
         LAD.__init__(self, defaults, **attributes)
         LL.__init__(self, elements)
 
@@ -21,8 +26,8 @@ class Tag(LADLL):
         return self.__parent__
 
     def replace(self, element):
-        self.add_neighbour(element)
         self.detach()
+        self.add_neighbour(element)
 
     def detach(self):
         self.__parent__.remove(self)
@@ -50,6 +55,9 @@ class Tag(LADLL):
             if item in self.__attributes__:
                 converter = self.__attributes__[item][0]
                 value = converter(value)
+                if isinstance(value, (LAD, LL)):
+                    value.__parent__ = self
+                    value.__parentattr__ = item
         super().__setitem__(item, value)
 
     def log_with(self, logger):
@@ -85,6 +93,9 @@ class Tag(LADLL):
 
     def __str__(self):
         return self.generate()
+
+    def nchildren(self):
+        return len(self.__elems__)
 
 
 class StyleTag(Tag):

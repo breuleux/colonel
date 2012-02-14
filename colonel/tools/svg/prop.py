@@ -1,4 +1,5 @@
 
+import exc
 from .. import namedlist, LL, LAD
 
 
@@ -97,7 +98,7 @@ class Transforms(LL):
     def log(self, event, start, stop, new):
         for element in new:
             if type(element) not in all_transforms:
-                raise Exc('svg/invalid_transform')(
+                raise exc.Exception['svg/invalid_transform'](
                     "{element} is not a valid transform",
                     element = element)
         super().log(start, stop, new)

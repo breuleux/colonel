@@ -13,7 +13,10 @@ class Logged:
         self.__logger__(self, *data)
 
     def log_with(self, logger = noop):
+        if logger == self.__logger__:
+            return False
         self.__logger__ = logger
+        return True
 
 
 class LL(Logged):
@@ -26,11 +29,17 @@ class LL(Logged):
         for element in elements:
             self.append(element)
 
-    def log_with(self, logger = noop):
-        super().log_with(logger)
-        for child in self[:]:
+    def log_ll(self, start, end, elements):
+        for child in elements:
             if hasattr(child, 'log_with'):
-                child.log_with(logger)
+                child.log_with(self.__logger__)
+        return self.__logger__('ll', start, end, elements)
+
+    def log_with(self, logger = noop):
+        if super().log_with(logger):
+            for child in self[:]:
+                if hasattr(child, 'log_with'):
+                    child.log_with(logger)
 
     def __getitem__(self, item):
         return self.__elems__[item]
@@ -41,28 +50,28 @@ class LL(Logged):
             start = item.start or 0
             stop = item.stop or len(self)
             value = list(value)
-            self.log('ll', start, stop, value)
+            self.log_ll(start, stop, value)
         else:
-            self.log('ll', item, item + 1, [value])
+            self.log_ll(item, item + 1, [value])
         self.__elems__[item] = value
 
     def __delitem__(self, item):
         if isinstance(item, slice):
             assert not item.step
             value = list(value)
-            self.log('ll', item.start, item.stop, [])
+            self.log_ll(item.start, item.stop, [])
         else:
-            self.log('ll', item, item + 1, [])
+            self.log_ll(item, item + 1, [])
         del self.__elems__[item]
 
     def append(self, element):
         elms = self.__elems__
-        self.log('ll', len(elms), len(elms), [element])
+        self.log_ll(len(elms), len(elms), [element])
         self[len(self):] = [element]
 
     def extend(self, elements):
         elms = self.__elems__
-        self.log('ll', len(elms), len(elms), elements)
+        self.log_ll(len(elms), len(elms), elements)
         self[len(self):] = elements
 
     def __iadd__(self, elements):
@@ -101,10 +110,16 @@ class LAD(Logged):
             self[x] = y
 
     def log_with(self, logger = noop):
-        super().log_with(logger)
-        for name, child in self.items():
-            if hasattr(child, 'log_with'):
-                child.log_with(logger)
+        if super().log_with(logger):
+            for name, child in self.items():
+                if hasattr(child, 'log_with'):
+                    child.log_with(logger)
+
+    def log_lad(self, item, value, old_value):
+        if hasattr(value, 'log_with'):
+            value.log_with(self.__logger__)
+        return self.__logger__('lad', item, value, old_value)
+
 
     # Dict behavior
     def __getitem__(self, item):
@@ -117,11 +132,11 @@ class LAD(Logged):
         if item.endswith("_"):
             item = item[:-1]
         item = item.replace("_", "-")
-        self.log('lad', item, value, self.__props__.get(item, None))
+        self.log_lad(item, value, self.__props__.get(item, None))
         self.__props__[item] = value
 
     def __delitem__(self, item):
-        self.log('lad', item, None, self.__props__.get(item, None))
+        self.log_lad(item, None, self.__props__.get(item, None))
         del self.__props__[item]
 
     def __getattr__(self, attr):

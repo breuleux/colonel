@@ -30,7 +30,7 @@ class Distribute(CommonGateSpec):
             triggers = [({'input': AVAIL, name: REQ}, self.do)
                         for name in self.result_names],
             description = """
-            Outputs 'input' in 'rX', X ranging from 0 to {n}.
+            Outputs 'input' in 'oX', X ranging from 0 to {n}.
             """.format(n = n-1))
 
     def do(self, state, input):
@@ -74,58 +74,116 @@ class Distribute(CommonGateSpec):
 ### IfThenElse ###
 ##################
 
-def if_do(state, cond = VOID, iftrue = VOID, iffalse = VOID):
-    # Careful about the arguments: normally, only one of cond, iftrue
-    # and iffalse is not going to be VOID, and it depends on the value
-    # of the flow state, state[0], below. See also: IfThenElse.deps_map.
-    fs = state[0]
-    if fs == 0:
-        # We are checking the condition. If the condition is true, we
-        # will place ourselves in state 1, and the next time we
-        # propagate we will ask for iftrue. If the condition is false,
-        # we get state 2, and we will fetch iffalse.
-        fs = 1 if cond else 2
-        ret = VOID     # there is no output yet
-        consumed = {0} # consume the condition (port #0)
-    elif fs == 1:
-        # The condition was true in the previous run. Return iftrue.
-        fs = 0         # return to state 0 (next condition)
-        ret = iftrue   # output iftrue
-        consumed = {1} # consume iftrue (port #1)
-    elif fs == 2:
-        # The condition was false in the previous run. Return iffalse.
-        fs = 0         # return to state 0 (next condition)
-        ret = iffalse  # output iffalse
-        consumed = {2} # consume iffalse (port #2)
-    else:
-        raise MPVMException['if/badstate'](
-            "IfThenElse should not have internal"
-            " state other than 0, 1 or 2...",
-            )
-    return ((fs, None),
-            dict(out = ret),
-            consumed)
+# def if_do(state, cond = VOID, iftrue = VOID, iffalse = VOID):
+#     # Careful about the arguments: normally, only one of cond, iftrue
+#     # and iffalse is not going to be VOID, and it depends on the value
+#     # of the flow state, state[0], below. See also: IfThenElse.deps_map.
+#     fs = state[0]
+#     if fs == 0:
+#         # We are checking the condition. If the condition is true, we
+#         # will place ourselves in state 1, and the next time we
+#         # propagate we will ask for iftrue. If the condition is false,
+#         # we get state 2, and we will fetch iffalse.
+#         fs = 1 if cond else 2
+#         ret = VOID     # there is no output yet
+#         consumed = {0} # consume the condition (port #0)
+#     elif fs == 1:
+#         # The condition was true in the previous run. Return iftrue.
+#         fs = 0         # return to state 0 (next condition)
+#         ret = iftrue   # output iftrue
+#         consumed = {1} # consume iftrue (port #1)
+#     elif fs == 2:
+#         # The condition was false in the previous run. Return iffalse.
+#         fs = 0         # return to state 0 (next condition)
+#         ret = iffalse  # output iffalse
+#         consumed = {2} # consume iffalse (port #2)
+#     else:
+#         raise MPVMException['if/badstate'](
+#             "IfThenElse should not have internal"
+#             " state other than 0, 1 or 2...",
+#             )
+#     return ((fs, None),
+#             dict(out = ret),
+#             consumed)
 
-IfThenElse = CommonGateSpec(
-    name = 'if',
-    ports = ['cond', 'iftrue', 'iffalse', 'out', 'error'],
-    starter = lambda: (0, None),    # initialize to state 0 (the second element is unused)
-    deps_map = {(): {},
-                (0, 'out', REQ): {0: REQ},  # state 0 -> ask for condition
-                (1, 'out', REQ): {1: REQ},  # state 1 -> ask for iftrue
-                (2, 'out', REQ): {2: REQ}}, # state 2 -> ask for iffalse
-    triggers = [(0, {'out': REQ, 'cond': AVAIL}, if_do),
-                (1, {'out': REQ, 'iftrue': AVAIL}, if_do),
-                (2, {'out': REQ, 'iffalse': AVAIL}, if_do)],
-    description = """
-    IfThenElse implements a lazy If. It works as follows: first, we
-    are in state 0 and we request the condition. Depending on whether
-    the condition is true or false, we go to state 1 or 2. State 1
-    requests the computation of the true branch, state 2 requests that
-    of the false branch. The other branch is left unrequested, and
-    thus its associated computations are not performed. The
-    appropriate result is returned when available.
-    """)
+# IfThenElse = CommonGateSpec(
+#     name = 'if',
+#     ports = ['cond', 'iftrue', 'iffalse', 'out', 'error'],
+#     starter = lambda: (0, None),    # initialize to state 0 (the second element is unused)
+#     deps_map = {(): {},
+#                 (0, 'out', REQ): {0: REQ},  # state 0 -> ask for condition
+#                 (1, 'out', REQ): {1: REQ},  # state 1 -> ask for iftrue
+#                 (2, 'out', REQ): {2: REQ}}, # state 2 -> ask for iffalse
+#     triggers = [(0, {'out': REQ, 'cond': AVAIL}, if_do),
+#                 (1, {'out': REQ, 'iftrue': AVAIL}, if_do),
+#                 (2, {'out': REQ, 'iffalse': AVAIL}, if_do)],
+#     description = """
+#     IfThenElse implements a lazy If. It works as follows: first, we
+#     are in state 0 and we request the condition. Depending on whether
+#     the condition is true or false, we go to state 1 or 2. State 1
+#     requests the computation of the true branch, state 2 requests that
+#     of the false branch. The other branch is left unrequested, and
+#     thus its associated computations are not performed. The
+#     appropriate result is returned when available.
+#     """)
+
+class IfThenElseC(CommonGateSpec):
+
+    def __init__(self):
+        super().__init__(
+            name = 'if',
+            ports = ['cond', 'iftrue', 'iffalse', 'out', 'error'],
+            starter = lambda: (0, None),    # initialize to state 0 (the second element is unused)
+            deps_map = {(): {},
+                        (0, 'out', REQ): {0: REQ},  # state 0 -> ask for condition
+                        (1, 'out', REQ): {1: REQ},  # state 1 -> ask for iftrue
+                        (2, 'out', REQ): {2: REQ}}, # state 2 -> ask for iffalse
+            triggers = [(0, {'out': REQ, 'cond': AVAIL}, self.if_do),
+                        (1, {'out': REQ, 'iftrue': AVAIL}, self.if_do),
+                        (2, {'out': REQ, 'iffalse': AVAIL}, self.if_do)],
+            description = """
+            IfThenElse implements a lazy If. It works as follows: first, we
+            are in state 0 and we request the condition. Depending on whether
+            the condition is true or false, we go to state 1 or 2. State 1
+            requests the computation of the true branch, state 2 requests that
+            of the false branch. The other branch is left unrequested, and
+            thus its associated computations are not performed. The
+            appropriate result is returned when available.
+            """)
+
+    def if_do(self, state, cond = VOID, iftrue = VOID, iffalse = VOID):
+        # Careful about the arguments: normally, only one of cond, iftrue
+        # and iffalse is not going to be VOID, and it depends on the value
+        # of the flow state, state[0], below. See also: IfThenElse.deps_map.
+        fs = state[0]
+        if fs == 0:
+            # We are checking the condition. If the condition is true, we
+            # will place ourselves in state 1, and the next time we
+            # propagate we will ask for iftrue. If the condition is false,
+            # we get state 2, and we will fetch iffalse.
+            fs = 1 if cond else 2
+            ret = VOID     # there is no output yet
+            consumed = {0} # consume the condition (port #0)
+        elif fs == 1:
+            # The condition was true in the previous run. Return iftrue.
+            fs = 0         # return to state 0 (next condition)
+            ret = iftrue   # output iftrue
+            consumed = {1} # consume iftrue (port #1)
+        elif fs == 2:
+            # The condition was false in the previous run. Return iffalse.
+            fs = 0         # return to state 0 (next condition)
+            ret = iffalse  # output iffalse
+            consumed = {2} # consume iffalse (port #2)
+        else:
+            raise MPVMException['if/badstate'](
+                "IfThenElse should not have internal"
+                " state other than 0, 1 or 2...",
+                )
+        return ((fs, None),
+                dict(out = ret),
+                consumed)
+
+IfThenElse = IfThenElseC()
 
 
 
@@ -161,6 +219,10 @@ def EitherOnce(n):
                 return ((1, None),
                         {iname.replace('i', 'o'): args[iname]},
                         range(n))
+        # return ((0, None),
+        #         {},
+        #         set())
+        print(state, args)
         raise MPVMException['commongate/no_input'](
             "The Either gate instance {this} is not supposed to get"
             " called if there is no available input!",
@@ -427,21 +489,39 @@ def Sequence(n):
 ### Constant ###
 ################
 
-def Constant(x):
+class Constant(CommonGateSpec):
     """
     Constant(x) has no input ports. It always returns x.
     """
 
-    do = lambda state: (state, dict(out = x), set())
+    def __init__(self, value):
+        self.value = value
+        super().__init__(name = '`{x}`'.format(x = value),
+                         ports = ['out'],
+                         starter = lambda: (0, None), # state is not used
+                         deps_map = {(): {},
+                                     ('out', REQ): {}},
+                         triggers = [({'out': REQ}, self.do)],
+                         description = 'Constant')
 
-    return CommonGateSpec(
-        name = '`{x}`'.format(x = x),
-        ports = ['out'],
-        starter = lambda: (0, None), # state is not used
-        deps_map = {(): {},
-                    ('out', REQ): {}},
-        triggers = [({'out': REQ}, do)],
-        description = Constant.__doc__)
+    def do(self, state):
+        return (state, dict(out = self.value), set())
+
+# def Constant(x):
+#     """
+#     Constant(x) has no input ports. It always returns x.
+#     """
+
+#     do = lambda state: (state, dict(out = x), set())
+
+#     return CommonGateSpec(
+#         name = '`{x}`'.format(x = x),
+#         ports = ['out'],
+#         starter = lambda: (0, None), # state is not used
+#         deps_map = {(): {},
+#                     ('out', REQ): {}},
+#         triggers = [({'out': REQ}, do)],
+#         description = Constant.__doc__)
 
 
 
@@ -512,7 +592,7 @@ def Explode(n):
 #######################
 
 Add = FunctionGateSpec("Add", lambda a, b: a + b)
-Sub = FunctionGateSpec("Sub", lambda a, b: a - b)
+Sub = FunctionGateSpec("Sub", lambda a, b: -b if a is None else (a - b))
 Mul = FunctionGateSpec("Mul", lambda a, b: a * b)
 Div = FunctionGateSpec("Div", lambda a, b: a / b)
 
@@ -526,6 +606,9 @@ Lt = FunctionGateSpec("Lt", lambda a, b: a < b)
 Gt = FunctionGateSpec("Gt", lambda a, b: a > b)
 Lte = FunctionGateSpec("Lte", lambda a, b: a <= b)
 Gte = FunctionGateSpec("Gte", lambda a, b: a >= b)
+
+Sqrt = FunctionGateSpec("Sqrt", lambda a: a ** 0.5)
+
 
 def Join(n):
     return FunctionGateSpec("Join{n}".format(n = n),

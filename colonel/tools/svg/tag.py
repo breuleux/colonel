@@ -102,6 +102,10 @@ class StyleTag(Tag):
     __tag__ = "style"
 
 
+class Span(Tag):
+    __tag__ = 'span'
+
+
 class SVG(Tag):
     __tag__ = 'svg'
     __attributes__ = dmerge(Tag.__attributes__,

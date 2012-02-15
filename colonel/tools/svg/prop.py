@@ -95,7 +95,7 @@ class Transforms(LL):
             transforms = [transforms]
         super().__init__(transforms)
 
-    def log(self, event, start, stop, new):
+    def log(self, event, start, stop, new, commit):
         for element in new:
             if type(element) not in all_transforms:
                 raise exc.Exception['svg/invalid_transform'](

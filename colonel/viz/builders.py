@@ -12,7 +12,9 @@ def strip(x):
 
 class GateMaker:
 
-    def __init__(self, builders):
+    def __init__(self, builders = None):
+        if builders is None:
+            builders = default_builders
         self.builders = builders
         self.gate_map = {}
 
@@ -69,6 +71,7 @@ class SVGListener(core.GateListener):
         #     }
         figure = self.gate_map[gate]
         isc = isinstance(gate, core.Circuit)
+        # print('triggered', figure.shape.id)
         if triggered:
             figure.shape.style.fill = '#dddddd' if isc else '#40ff40'
         else:
@@ -179,9 +182,26 @@ def make_distribute_gate(gate, make_gate):
 def make_bottleneck_gate(gate, make_gate):
     return standard_trapezoid_gate.create_box("v", gate.spec.inames, ['out'])
 
-builders = {core.FunctionGateSpec: make_function_gate,
-            lib.Distribute: make_distribute_gate,
-            lib.Bottleneck: make_bottleneck_gate,
-            core.CircuitSpec: lambda g, mg: make_circuit_gate(g, standard_circuit_gate, mg)}
+def make_constant_gate(gate, make_gate):
+    template = standard_rect_gate.variant(title_font_size = 40,
+                                          title_class = 'constant')
+    return template.titled_box(repr(gate.spec.value),
+                               bottom = ['out:'])
+
+def make_if_gate(gate, make_gate):
+    template = standard_rect_gate
+    return template.titled_box('if',
+                               top = ['cond:?',
+                                      'iftrue:T',
+                                      'iffalse:F'],
+                               bottom = ['out:↓'],
+                               right = ['error:!'])
+
+default_builders = {core.FunctionGateSpec: make_function_gate,
+                    lib.Distribute: make_distribute_gate,
+                    lib.Bottleneck: make_bottleneck_gate,
+                    lib.Constant: make_constant_gate,
+                    lib.IfThenElseC: make_if_gate,
+                    core.CircuitSpec: lambda g, mg: make_circuit_gate(g, standard_circuit_gate, mg)}
 
 

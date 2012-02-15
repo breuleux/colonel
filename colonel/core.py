@@ -683,7 +683,6 @@ class Gate:
     def set_incoming(self, port, value):
         pnum = self.port_num(port)
         self.incoming[pnum] = value
-        # self.tags_incoming[pnum] = AVAIL if value is not VOID else NOTAG
         self.set_tag(pnum, AVAIL if value is not VOID else NOTAG)
         for listener in self.listeners:
             listener.set_incoming(self, port, value)

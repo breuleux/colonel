@@ -36,11 +36,11 @@ class LL(Logged):
         for element in elements:
             self.append(element)
 
-    def log_ll(self, start, end, elements):
+    def log_ll(self, start, end, elements, commit):
         for child in elements:
             if hasattr(child, 'log_with'):
                 child.log_with(self.__logger__)
-        return self.log('ll', start, end, elements)
+        return self.log('ll', start, end, elements, commit)
 
     def log_with(self, logger = noop):
         if super().log_with(logger):
@@ -52,24 +52,34 @@ class LL(Logged):
         return self.__elems__[item]
 
     def __setitem__(self, item, value):
+        done = []
+        def commit():
+            if not done:
+                self.__elems__[item] = value
+                done.append(True)
         if isinstance(item, slice):
             assert not item.step
             start = item.start or 0
             stop = item.stop or len(self)
             value = list(value)
-            self.log_ll(start, stop, value)
+            self.log_ll(start, stop, value, commit)
         else:
-            self.log_ll(item, item + 1, [value])
-        self.__elems__[item] = value
+            self.log_ll(item, item + 1, [value], commit)
+        commit()
 
     def __delitem__(self, item):
+        done = []
+        def commit():
+            if not done:
+                del self.__elems__[item]
+                done.append(True)
         if isinstance(item, slice):
             assert not item.step
             value = list(value)
-            self.log_ll(item.start, item.stop, [])
+            self.log_ll(item.start, item.stop, [], commit)
         else:
-            self.log_ll(item, item + 1, [])
-        del self.__elems__[item]
+            self.log_ll(item, item + 1, [], commit)
+        commit()
 
     def append(self, element):
         elms = self.__elems__
@@ -100,6 +110,7 @@ class LL(Logged):
 
     def same(self, other):
         return (type(self) == type(other)
+                and len(self.__elems__) == len(other.__elems__)
                 and all(same(x, y)
                         for x, y in zip(self.__elems__,
                                         other.__elems__)))
@@ -126,10 +137,10 @@ class LAD(Logged):
                 if hasattr(child, 'log_with'):
                     child.log_with(logger)
 
-    def log_lad(self, item, value, old_value):
+    def log_lad(self, item, value, old_value, commit):
         if hasattr(value, 'log_with'):
             value.log_with(self.__logger__)
-        return self.log('lad', item, value, old_value)
+        return self.log('lad', item, value, old_value, commit)
 
 
     # Dict behavior
@@ -140,15 +151,22 @@ class LAD(Logged):
         return self.__props__[item]
 
     def __setitem__(self, item, value):
+        def commit():
+            self.__props__[item] = value
         if item.endswith("_"):
             item = item[:-1]
         item = item.replace("_", "-")
-        self.log_lad(item, value, self.__props__.get(item, None))
-        self.__props__[item] = value
+        self.log_lad(item, value, self.__props__.get(item, None), commit)
+        commit()
 
     def __delitem__(self, item):
-        self.log_lad(item, None, self.__props__.get(item, None))
-        del self.__props__[item]
+        done = []
+        def commit():
+            if not done:
+                del self.__props__[item]
+                done.append(True)
+        self.log_lad(item, None, self.__props__.get(item, None), commit)
+        commit()
 
     def __getattr__(self, attr):
         if attr.startswith("__"):
@@ -178,6 +196,7 @@ class LAD(Logged):
 
     def same(self, other):
         return (type(self) == type(other)
+                and self.__props__.keys() == other.__props__.keys()
                 and all(same(v, other[k])
                         for k, v in self.items()))
 
